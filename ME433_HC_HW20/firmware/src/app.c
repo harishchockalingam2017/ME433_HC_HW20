@@ -69,6 +69,11 @@ int gotRx = 0; // the flag
 int rxVal = 0; // a place to store the int that was received
 int m=0;
 int mParam[5]={0};
+
+int left; int right; int error;
+double kp=3.5; 
+int MAX_DUTY=1119;
+int flag1=0; 
 // *****************************************************************************
 /* Application Data
   Summary:
@@ -441,14 +446,14 @@ void APP_Tasks(void) {
                         error = rxVal - 320; // 240 means the dot is in the middle of the screen
                     if (error<0) { // slow down the left motor to steer to the left
                         error  = -error;
-                        left = MAX_DUTY - kp*error;
+                        left = MAX_DUTY - (int)(kp*error);
                         right = MAX_DUTY;
                         if (left < 0){
                             left = 0;
                         }
                     }
                     else { // slow down the right motor to steer to the right
-                        right = MAX_DUTY - kp*error;
+                        right = MAX_DUTY - (int)(kp*error);
                         left = MAX_DUTY;
                         if (right<0) {
                             right = 0;
@@ -458,7 +463,17 @@ void APP_Tasks(void) {
                     LATBbits.LATB3 = 0;
                     OC1RS = left;
                     OC4RS = right;
-                        OC3RS = 1500+mParam[4]*6000/180; // should set the motor to 90 degrees (0.5ms to 2.5ms is 1500 to 7500 for 0 to 180 degrees)
+                    
+                    if(flag1==0){
+                        OC3RS=1500+30*6000/180;
+                        flag1=1;
+                    }
+                    
+                    if(flag1==1){
+                        OC3RS=1500+150*6000/180;
+                        flag1=0;
+                    }
+                     
                         break; // get out of the while loop
                     } else if (appData.readBuffer[ii] == 0) {
                         break; // there was no newline, get out of the while loop
@@ -513,11 +528,8 @@ void APP_Tasks(void) {
             appData.state = APP_STATE_WAIT_FOR_WRITE_COMPLETE;
            
             if (gotRx) {
-                len = sprintf(dataOut, "m: %d got: %d\r\n",m, rxVal);
-                m++;
-                if(m>4){
-                    m=0;
-                }
+                len = sprintf(dataOut, "got: %d left: %d right: %d error: %d \r\n",rxVal,left,right,error);
+              
                 i++;
                 USB_DEVICE_CDC_Write(USB_DEVICE_CDC_INDEX_0,
                         &appData.writeTransferHandle,
@@ -525,9 +537,10 @@ void APP_Tasks(void) {
                         USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
                 rxPos = 0;
                 gotRx = 0;
+                 startTime = _CP0_GET_COUNT();
             } else {
-                len = sprintf(dataOut, "%d\r\n", i);
-                i++;
+                len = sprintf(dataOut, "left: %d right: %d error: %d \r\n", left,right,error);
+                
                 USB_DEVICE_CDC_Write(USB_DEVICE_CDC_INDEX_0,
                         &appData.writeTransferHandle, dataOut, len,
                         USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
